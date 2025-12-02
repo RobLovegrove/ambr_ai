@@ -48,6 +48,11 @@ export default function Home() {
     }
   };
 
+  const handleNewAnalysis = () => {
+    setAnalysis(null);
+    setError(null);
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
@@ -61,6 +66,8 @@ export default function Home() {
               onSubmit={handleAnalyze}
               isLoading={isLoading}
               error={error}
+              onNewAnalysis={handleNewAnalysis}
+              hasAnalysis={!!analysis}
             />
             {analysis && <AnalysisResults analysis={analysis} />}
           </div>
