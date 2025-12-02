@@ -7,7 +7,7 @@ const c = initContract();
 export const contract = c.router({
   analyze: {
     method: 'POST',
-    path: '/analyze',
+    path: '/api/analyze',
     body: transcriptSchema,
     responses: {
       200: meetingAnalysisSchema.extend({
@@ -25,7 +25,7 @@ export const contract = c.router({
   },
   getAnalysis: {
     method: 'GET',
-    path: '/analysis/:id',
+    path: '/api/analysis/:id',
     pathParams: z.object({
       id: z.string(),
     }),
@@ -54,7 +54,7 @@ export const contract = c.router({
   },
   listAnalyses: {
     method: 'GET',
-    path: '/analyses',
+    path: '/api/analyses',
     query: z.object({
       limit: z.string().optional(),
       offset: z.string().optional(),
