@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { TranscriptForm } from '../components/TranscriptForm';
 import { AnalysisResults } from '../components/AnalysisResults';
 import { AnalysisHistory } from '../components/AnalysisHistory';
 import type { MeetingAnalysis } from '@ambr/shared';
 
 export default function Home() {
+  const queryClient = useQueryClient();
   const [analysis, setAnalysis] = useState<
     (MeetingAnalysis & { id: string; transcriptId: string; createdAt: string }) | null
   >(null);
@@ -36,6 +38,9 @@ export default function Home() {
 
       const data = await response.json();
       setAnalysis(data);
+      
+      // Invalidate and refetch the analyses query to update the history
+      queryClient.invalidateQueries({ queryKey: ['analyses'] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
