@@ -33,6 +33,7 @@ export const contract = c.router({
       200: meetingAnalysisSchema.extend({
         id: z.string(),
         transcriptId: z.string(),
+        transcriptText: z.string().optional(),
         createdAt: z.string(),
         actionItems: z.array(
           meetingAnalysisSchema.shape.actionItems.element.extend({

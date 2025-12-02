@@ -10,7 +10,7 @@ import type { MeetingAnalysis } from '@ambr/shared';
 export default function Home() {
   const queryClient = useQueryClient();
   const [analysis, setAnalysis] = useState<
-    (MeetingAnalysis & { id: string; transcriptId: string; createdAt: string }) | null
+    (MeetingAnalysis & { id: string; transcriptId: string; createdAt: string; transcriptText?: string }) | null
   >(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +53,21 @@ export default function Home() {
     setError(null);
   };
 
+  const handleSelectAnalysis = async (id: string) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analysis/${id}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch analysis');
+      }
+      const data = await response.json();
+      setAnalysis(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analysis');
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
@@ -68,11 +83,12 @@ export default function Home() {
               error={error}
               onNewAnalysis={handleNewAnalysis}
               hasAnalysis={!!analysis}
+              initialTranscript={analysis?.transcriptText || ''}
             />
             {analysis && <AnalysisResults analysis={analysis} />}
           </div>
           <div className="lg:col-span-1">
-            <AnalysisHistory />
+            <AnalysisHistory onSelectAnalysis={handleSelectAnalysis} />
           </div>
         </div>
       </div>

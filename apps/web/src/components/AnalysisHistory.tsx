@@ -10,7 +10,11 @@ interface Analysis {
   createdAt: string;
 }
 
-export function AnalysisHistory() {
+interface AnalysisHistoryProps {
+  onSelectAnalysis?: (id: string) => void;
+}
+
+export function AnalysisHistory({ onSelectAnalysis }: AnalysisHistoryProps) {
   const { data, isLoading, error } = useQuery<{
     analyses: Analysis[];
     total: number;
@@ -53,6 +57,7 @@ export function AnalysisHistory() {
           {data.analyses.map((analysis) => (
             <li
               key={analysis.id}
+              onClick={() => onSelectAnalysis?.(analysis.id)}
               className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <div className="flex items-center justify-between mb-2">

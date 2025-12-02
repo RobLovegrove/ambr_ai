@@ -112,6 +112,7 @@ export async function getAnalysisById(id: string) {
     include: {
       actionItems: true,
       keyDecisions: true,
+      transcript: true,
     },
   });
 
@@ -129,6 +130,7 @@ export async function getAnalysisById(id: string) {
     body: {
       id: analysis.id,
       transcriptId: analysis.transcriptId,
+      transcriptText: analysis.transcript.text,
       sentiment: analysis.sentiment as 'positive' | 'neutral' | 'negative' | 'mixed',
       summary: analysis.summary || undefined,
       actionItems: analysis.actionItems.map((item) => ({

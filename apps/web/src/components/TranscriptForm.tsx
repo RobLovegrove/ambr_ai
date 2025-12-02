@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface TranscriptFormProps {
   onSubmit: (transcript: string) => void;
@@ -8,6 +8,7 @@ interface TranscriptFormProps {
   error: string | null;
   onNewAnalysis?: () => void;
   hasAnalysis?: boolean;
+  initialTranscript?: string;
 }
 
 export function TranscriptForm({
@@ -16,8 +17,16 @@ export function TranscriptForm({
   error,
   onNewAnalysis,
   hasAnalysis = false,
+  initialTranscript = '',
 }: TranscriptFormProps) {
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState(initialTranscript);
+
+  // Update transcript when initialTranscript changes (e.g., when selecting from history)
+  useEffect(() => {
+    if (initialTranscript) {
+      setTranscript(initialTranscript);
+    }
+  }, [initialTranscript]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
