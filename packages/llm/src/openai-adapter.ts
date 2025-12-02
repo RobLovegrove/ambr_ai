@@ -30,6 +30,14 @@ export class OpenAIAdapter implements LLMAdapter {
 3. Overall sentiment (positive, neutral, negative, or mixed)
 4. A brief summary (optional)
 
+IMPORTANT - Sentiment classification guidelines:
+- "positive": Meeting shows enthusiasm, celebration, success, praise, or optimistic outlook
+- "neutral": Routine updates, status reports, standard business discussions without strong emotional tone
+- "negative": Concerns, problems, complaints, criticism, or pessimistic outlook
+- "mixed": Combination of positive and negative elements
+
+Most routine status update meetings should be classified as "neutral" unless there are clear positive or negative emotional indicators.
+
 Return a JSON object with this structure:
 {
   "actionItems": [{"id": "1", "description": "...", "owner": "name or null", "deadline": "date or null"}],
