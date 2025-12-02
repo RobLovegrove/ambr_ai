@@ -189,3 +189,34 @@ export async function listAnalyses(options?: { limit?: number; offset?: number }
   };
 }
 
+/**
+ * Delete an analysis by ID (cascade deletes related records)
+ */
+export async function deleteAnalysisById(id: string) {
+  const analysis = await prisma.analysis.findUnique({
+    where: { id },
+  });
+
+  if (!analysis) {
+    return {
+      status: 404,
+      body: {
+        error: 'Analysis not found',
+      },
+    };
+  }
+
+  // Delete the analysis (cascade will delete action items, key decisions, and transcript)
+  await prisma.analysis.delete({
+    where: { id },
+  });
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      message: 'Analysis deleted successfully',
+    },
+  };
+}
+

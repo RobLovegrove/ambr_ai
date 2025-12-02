@@ -75,5 +75,21 @@ export const contract = c.router({
       }),
     },
   },
+  deleteAnalysis: {
+    method: 'DELETE',
+    path: '/api/analysis/:id',
+    pathParams: z.object({
+      id: z.string(),
+    }),
+    responses: {
+      200: z.object({
+        success: z.boolean(),
+        message: z.string(),
+      }),
+      404: z.object({
+        error: z.string(),
+      }),
+    },
+  },
 });
 

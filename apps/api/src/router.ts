@@ -1,4 +1,4 @@
-import { analyzeTranscript, getAnalysisById, listAnalyses } from './handlers';
+import { analyzeTranscript, getAnalysisById, listAnalyses, deleteAnalysisById } from './handlers';
 
 export const router = {
   analyze: async ({ body }) => {
@@ -18,6 +18,12 @@ export const router = {
       limit: query.limit ? parseInt(query.limit) : undefined,
       offset: query.offset ? parseInt(query.offset) : undefined,
     });
+    // Handlers already return { status, body }, so just pass through
+    return result;
+  },
+
+  deleteAnalysis: async ({ params }) => {
+    const result = await deleteAnalysisById(params.id);
     // Handlers already return { status, body }, so just pass through
     return result;
   },

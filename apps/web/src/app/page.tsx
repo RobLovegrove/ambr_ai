@@ -68,6 +68,30 @@ export default function Home() {
     }
   };
 
+  const handleDeleteAnalysis = async (id: string) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analysis/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      if (!response.ok) {
+        throw new Error('Failed to delete analysis');
+      }
+      
+      // If the deleted analysis is currently displayed, clear it
+      if (analysis?.id === id) {
+        setAnalysis(null);
+      }
+      
+      // Invalidate and refetch the analyses query to update the history
+      queryClient.invalidateQueries({ queryKey: ['analyses'] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete analysis');
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
@@ -88,7 +112,10 @@ export default function Home() {
             {analysis && <AnalysisResults analysis={analysis} />}
           </div>
           <div className="lg:col-span-1">
-            <AnalysisHistory onSelectAnalysis={handleSelectAnalysis} />
+            <AnalysisHistory
+              onSelectAnalysis={handleSelectAnalysis}
+              onDeleteAnalysis={handleDeleteAnalysis}
+            />
           </div>
         </div>
       </div>
