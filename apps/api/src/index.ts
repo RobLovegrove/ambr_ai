@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { initServer } from '@ts-rest/express';
+import { initServer, createExpressEndpoints } from '@ts-rest/express';
 import { contract } from './contract';
 import { router } from './router';
 import dotenv from 'dotenv';
@@ -15,7 +15,13 @@ app.use(express.json());
 
 const s = initServer();
 
-app.use('/api', s.router(contract, router));
+// Create ts-rest router
+const apiRouter = s.router(contract, router);
+
+// Bind ts-rest router to Express app with base path
+createExpressEndpoints(contract, apiRouter, app, {
+  basePath: '/api',
+});
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

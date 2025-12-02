@@ -1,18 +1,24 @@
-import { contract } from './contract';
 import { analyzeTranscript, getAnalysisById, listAnalyses } from './handlers';
 
 export const router = {
-  analyze: async ({ body }: { body: { text: string } }) => {
-    return analyzeTranscript(body.text);
+  analyze: async ({ body }) => {
+    const result = await analyzeTranscript(body.text);
+    // Handlers already return { status, body }, so just pass through
+    return result;
   },
-  getAnalysis: async ({ params }: { params: { id: string } }) => {
-    return getAnalysisById(params.id);
+
+  getAnalysis: async ({ params }) => {
+    const result = await getAnalysisById(params.id);
+    // Handlers already return { status, body }, so just pass through
+    return result;
   },
-  listAnalyses: async ({ query }: { query: { limit?: string; offset?: string } }) => {
-    return listAnalyses({
+
+  listAnalyses: async ({ query }) => {
+    const result = await listAnalyses({
       limit: query.limit ? parseInt(query.limit) : undefined,
       offset: query.offset ? parseInt(query.offset) : undefined,
     });
+    // Handlers already return { status, body }, so just pass through
+    return result;
   },
 };
-
