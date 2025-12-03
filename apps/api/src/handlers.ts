@@ -1,6 +1,7 @@
 import { prisma } from '@ambr/db';
 import { OpenAIAdapter, type LLMAdapter } from '@ambr/llm';
 import { LLMAdapterError } from '@ambr/llm/src/adapter';
+import { Prisma } from '@prisma/client';
 
 /**
  * Get the LLM adapter based on available API keys
@@ -34,6 +35,7 @@ export async function analyzeTranscript(transcriptText: string) {
     const dbAnalysis = await prisma.analysis.create({
       data: {
         transcriptId: transcript.id,
+        title: analysis.title || null,
         sentiment: analysis.sentiment,
         summary: analysis.summary || null,
         actionItems: {
@@ -61,6 +63,7 @@ export async function analyzeTranscript(transcriptText: string) {
       body: {
         id: dbAnalysis.id,
         transcriptId: dbAnalysis.transcriptId,
+        title: dbAnalysis.title || undefined,
         actionItems: dbAnalysis.actionItems.map((item) => ({
           id: item.id,
           description: item.description,
@@ -78,6 +81,7 @@ export async function analyzeTranscript(transcriptText: string) {
       },
     };
   } catch (error) {
+    // Handle LLM-specific errors
     if (error instanceof LLMAdapterError) {
       return {
         status: 500,
@@ -86,6 +90,28 @@ export async function analyzeTranscript(transcriptText: string) {
         },
       };
     }
+    
+    // Handle Prisma validation errors
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return {
+        status: 400,
+        body: {
+          error: `Invalid data: ${error.message}`,
+        },
+      };
+    }
+    
+    // Handle Prisma client errors (connection, etc.)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return {
+        status: 500,
+        body: {
+          error: 'Database error occurred',
+        },
+      };
+    }
+    
+    // Handle generic errors
     if (error instanceof Error) {
       return {
         status: 500,
@@ -94,6 +120,8 @@ export async function analyzeTranscript(transcriptText: string) {
         },
       };
     }
+    
+    // Fallback for unknown errors
     return {
       status: 500,
       body: {
@@ -107,116 +135,188 @@ export async function analyzeTranscript(transcriptText: string) {
  * Get a specific analysis by ID
  */
 export async function getAnalysisById(id: string) {
-  const analysis = await prisma.analysis.findUnique({
-    where: { id },
-    include: {
-      actionItems: true,
-      keyDecisions: true,
-      transcript: true,
-    },
-  });
+  try {
+    const analysis = await prisma.analysis.findUnique({
+      where: { id },
+      include: {
+        actionItems: true,
+        keyDecisions: true,
+        transcript: true,
+      },
+    });
 
-  if (!analysis) {
+    if (!analysis) {
+      return {
+        status: 404,
+        body: {
+          error: 'Analysis not found',
+        },
+      };
+    }
+
     return {
-      status: 404,
+      status: 200,
       body: {
-        error: 'Analysis not found',
+        id: analysis.id,
+        transcriptId: analysis.transcriptId,
+        transcriptText: analysis.transcript.text,
+        title: analysis.title || undefined,
+        sentiment: analysis.sentiment as 'positive' | 'neutral' | 'negative' | 'mixed',
+        summary: analysis.summary || undefined,
+        actionItems: analysis.actionItems.map((item) => ({
+          id: item.id,
+          description: item.description,
+          owner: item.owner,
+          deadline: item.deadline,
+          createdAt: item.createdAt.toISOString(),
+        })),
+        keyDecisions: analysis.keyDecisions.map((decision) => ({
+          id: decision.id,
+          decision: decision.decision,
+          context: decision.context,
+          createdAt: decision.createdAt.toISOString(),
+        })),
+        createdAt: analysis.createdAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return {
+        status: 500,
+        body: {
+          error: 'Database error occurred',
+        },
+      };
+    }
+    return {
+      status: 500,
+      body: {
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       },
     };
   }
-
-  return {
-    status: 200,
-    body: {
-      id: analysis.id,
-      transcriptId: analysis.transcriptId,
-      transcriptText: analysis.transcript.text,
-      sentiment: analysis.sentiment as 'positive' | 'neutral' | 'negative' | 'mixed',
-      summary: analysis.summary || undefined,
-      actionItems: analysis.actionItems.map((item) => ({
-        id: item.id,
-        description: item.description,
-        owner: item.owner,
-        deadline: item.deadline,
-        createdAt: item.createdAt.toISOString(),
-      })),
-      keyDecisions: analysis.keyDecisions.map((decision) => ({
-        id: decision.id,
-        decision: decision.decision,
-        context: decision.context,
-        createdAt: decision.createdAt.toISOString(),
-      })),
-      createdAt: analysis.createdAt.toISOString(),
-    },
-  };
 }
 
 /**
  * List all analyses with pagination
  */
 export async function listAnalyses(options?: { limit?: number; offset?: number }) {
-  const limit = options?.limit || 10;
-  const offset = options?.offset || 0;
+  try {
+    const limit = options?.limit || 10;
+    const offset = options?.offset || 0;
 
-  const [analyses, total] = await Promise.all([
-    prisma.analysis.findMany({
-      take: limit,
-      skip: offset,
-      orderBy: { createdAt: 'desc' },
+    // Validate pagination parameters
+    if (limit < 1 || limit > 100) {
+      return {
+        status: 400,
+        body: {
+          error: 'Limit must be between 1 and 100',
+        },
+      };
+    }
+    if (offset < 0) {
+      return {
+        status: 400,
+        body: {
+          error: 'Offset must be non-negative',
+        },
+      };
+    }
+
+    const [analyses, total] = await Promise.all([
+      prisma.analysis.findMany({
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         transcriptId: true,
+        title: true,
         sentiment: true,
         summary: true,
         createdAt: true,
       },
-    }),
-    prisma.analysis.count(),
-  ]);
+      }),
+      prisma.analysis.count(),
+    ]);
 
-  return {
-    status: 200,
-    body: {
-      analyses: analyses.map((analysis) => ({
-        id: analysis.id,
-        transcriptId: analysis.transcriptId,
-        sentiment: analysis.sentiment,
-        summary: analysis.summary,
-        createdAt: analysis.createdAt.toISOString(),
-      })),
-      total,
-    },
-  };
+    return {
+      status: 200,
+      body: {
+        analyses: analyses.map((analysis) => ({
+          id: analysis.id,
+          transcriptId: analysis.transcriptId,
+          title: analysis.title,
+          sentiment: analysis.sentiment,
+          summary: analysis.summary,
+          createdAt: analysis.createdAt.toISOString(),
+        })),
+        total,
+      },
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return {
+        status: 500,
+        body: {
+          error: 'Database error occurred',
+        },
+      };
+    }
+    return {
+      status: 500,
+      body: {
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+    };
+  }
 }
 
 /**
  * Delete an analysis by ID (cascade deletes related records)
  */
 export async function deleteAnalysisById(id: string) {
-  const analysis = await prisma.analysis.findUnique({
-    where: { id },
-  });
+  try {
+    const analysis = await prisma.analysis.findUnique({
+      where: { id },
+    });
 
-  if (!analysis) {
+    if (!analysis) {
+      return {
+        status: 404,
+        body: {
+          error: 'Analysis not found',
+        },
+      };
+    }
+
+    // Delete the analysis (cascade will delete action items, key decisions, and transcript)
+    await prisma.analysis.delete({
+      where: { id },
+    });
+
     return {
-      status: 404,
+      status: 200,
       body: {
-        error: 'Analysis not found',
+        success: true,
+        message: 'Analysis deleted successfully',
+      },
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return {
+        status: 500,
+        body: {
+          error: 'Database error occurred',
+        },
+      };
+    }
+    return {
+      status: 500,
+      body: {
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       },
     };
   }
-
-  // Delete the analysis (cascade will delete action items, key decisions, and transcript)
-  await prisma.analysis.delete({
-    where: { id },
-  });
-
-  return {
-    status: 200,
-    body: {
-      success: true,
-      message: 'Analysis deleted successfully',
-    },
-  };
 }
 

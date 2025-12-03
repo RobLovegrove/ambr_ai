@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 interface Analysis {
   id: string;
   transcriptId: string;
+  title: string | null;
   sentiment: string;
   summary: string | null;
   createdAt: string;
@@ -13,9 +14,10 @@ interface Analysis {
 interface AnalysisHistoryProps {
   onSelectAnalysis?: (id: string) => void;
   onDeleteAnalysis?: (id: string) => void;
+  selectedAnalysisId?: string | null;
 }
 
-export function AnalysisHistory({ onSelectAnalysis, onDeleteAnalysis }: AnalysisHistoryProps) {
+export function AnalysisHistory({ onSelectAnalysis, onDeleteAnalysis, selectedAnalysisId }: AnalysisHistoryProps) {
   const { data, isLoading, error } = useQuery<{
     analyses: Analysis[];
     total: number;
@@ -26,7 +28,8 @@ export function AnalysisHistory({ onSelectAnalysis, onDeleteAnalysis }: Analysis
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analyses`
       );
       if (!response.ok) {
-        throw new Error('Failed to fetch analyses');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analyses' }));
+        throw new Error(errorData.error || `Failed to fetch analyses (${response.status})`);
       }
       return response.json();
     },
@@ -45,7 +48,10 @@ export function AnalysisHistory({ onSelectAnalysis, onDeleteAnalysis }: Analysis
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-2xl font-semibold mb-4 text-gray-900">Analysis History</h2>
-        <p className="text-red-500">Error loading history</p>
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+          <p className="font-medium">Error loading history</p>
+          <p className="text-sm mt-1">{error instanceof Error ? error.message : 'An unknown error occurred'}</p>
+        </div>
       </div>
     );
   }
@@ -58,7 +64,11 @@ export function AnalysisHistory({ onSelectAnalysis, onDeleteAnalysis }: Analysis
           {data.analyses.map((analysis) => (
             <li
               key={analysis.id}
-              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+              className={`border rounded-lg p-4 transition-colors ${
+                selectedAnalysisId === analysis.id
+                  ? 'border-blue-500 bg-blue-50 shadow-sm'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div
@@ -83,8 +93,8 @@ export function AnalysisHistory({ onSelectAnalysis, onDeleteAnalysis }: Analysis
                       {analysis.sentiment}
                     </span>
                   </div>
-                  {analysis.summary && (
-                    <p className="text-sm text-gray-700 line-clamp-2">{analysis.summary}</p>
+                  {analysis.title && (
+                    <p className="text-sm font-medium text-gray-900">{analysis.title}</p>
                   )}
                 </div>
                 {onDeleteAnalysis && (

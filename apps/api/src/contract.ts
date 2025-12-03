@@ -13,6 +13,7 @@ export const contract = c.router({
       200: meetingAnalysisSchema.extend({
         id: z.string(),
         transcriptId: z.string(),
+        title: z.string().optional(),
         createdAt: z.string(),
       }),
       400: z.object({
@@ -34,6 +35,7 @@ export const contract = c.router({
         id: z.string(),
         transcriptId: z.string(),
         transcriptText: z.string().optional(),
+        title: z.string().optional(),
         createdAt: z.string(),
         actionItems: z.array(
           meetingAnalysisSchema.shape.actionItems.element.extend({
@@ -51,6 +53,9 @@ export const contract = c.router({
       404: z.object({
         error: z.string(),
       }),
+      500: z.object({
+        error: z.string(),
+      }),
     },
   },
   listAnalyses: {
@@ -66,12 +71,19 @@ export const contract = c.router({
           z.object({
             id: z.string(),
             transcriptId: z.string(),
+            title: z.string().nullable(),
             sentiment: z.string(),
             summary: z.string().nullable(),
             createdAt: z.string(),
           })
         ),
         total: z.number(),
+      }),
+      400: z.object({
+        error: z.string(),
+      }),
+      500: z.object({
+        error: z.string(),
       }),
     },
   },
@@ -87,6 +99,9 @@ export const contract = c.router({
         message: z.string(),
       }),
       404: z.object({
+        error: z.string(),
+      }),
+      500: z.object({
         error: z.string(),
       }),
     },

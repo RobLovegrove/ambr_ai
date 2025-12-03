@@ -25,10 +25,11 @@ export class OpenAIAdapter implements LLMAdapter {
           {
             role: 'system',
             content: `You are an expert meeting analyst. Analyze meeting transcripts and extract:
-1. Action items with owners and deadlines (if mentioned)
-2. Key decisions made during the meeting
-3. Overall sentiment (positive, neutral, negative, or mixed)
-4. A brief summary (optional)
+1. A short, descriptive title for the meeting (3-8 words, concise)
+2. Action items with owners and deadlines (if mentioned)
+3. Key decisions made during the meeting
+4. Overall sentiment (positive, neutral, negative, or mixed)
+5. A brief summary (optional)
 
 IMPORTANT - Sentiment classification guidelines:
 - "positive": Meeting shows enthusiasm, celebration, success, praise, or optimistic outlook
@@ -40,6 +41,7 @@ Most routine status update meetings should be classified as "neutral" unless the
 
 Return a JSON object with this structure:
 {
+  "title": "Short meeting title (3-8 words)",
   "actionItems": [{"id": "1", "description": "...", "owner": "name or null", "deadline": "date or null"}],
   "keyDecisions": [{"id": "1", "decision": "...", "context": "..."}],
   "sentiment": "positive|neutral|negative|mixed",
@@ -66,6 +68,11 @@ Be thorough and extract all action items and decisions mentioned.`,
       // Validate that we got the expected structure
       if (!analysis.actionItems || !analysis.keyDecisions || !analysis.sentiment) {
         throw new Error('Invalid response structure from OpenAI');
+      }
+      
+      // Ensure title exists (generate a default if missing)
+      if (!analysis.title) {
+        analysis.title = 'Meeting Analysis';
       }
 
       return analysis;

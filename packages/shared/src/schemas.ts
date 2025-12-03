@@ -25,6 +25,7 @@ export const sentimentSchema = z.enum(['positive', 'neutral', 'negative', 'mixed
 
 // Schema for the complete meeting analysis
 export const meetingAnalysisSchema = z.object({
+  title: z.string().optional(),
   actionItems: z.array(actionItemSchema),
   keyDecisions: z.array(keyDecisionSchema),
   sentiment: sentimentSchema,

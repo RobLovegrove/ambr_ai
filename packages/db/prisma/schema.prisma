@@ -24,6 +24,7 @@ model Transcript {
 model Analysis {
   id           String   @id @default(cuid())
   transcriptId String   @unique
+  title        String?  @db.Text
   sentiment    String
   summary      String?  @db.Text
   createdAt    DateTime @default(now())

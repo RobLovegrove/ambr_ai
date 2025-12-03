@@ -32,8 +32,8 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze transcript');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to analyze transcript' }));
+        throw new Error(errorData.error || `Failed to analyze transcript (${response.status})`);
       }
 
       const data = await response.json();
@@ -42,7 +42,12 @@ export default function Home() {
       // Invalidate and refetch the analyses query to update the history
       queryClient.invalidateQueries({ queryKey: ['analyses'] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      // Handle network errors
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Network error: Could not connect to the API server. Please check if the server is running.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -55,21 +60,29 @@ export default function Home() {
 
   const handleSelectAnalysis = async (id: string) => {
     try {
+      setError(null);
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analysis/${id}`
       );
       if (!response.ok) {
-        throw new Error('Failed to fetch analysis');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analysis' }));
+        throw new Error(errorData.error || `Failed to fetch analysis (${response.status})`);
       }
       const data = await response.json();
       setAnalysis(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load analysis');
+      // Handle network errors
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Network error: Could not connect to the API server.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load analysis');
+      }
     }
   };
 
   const handleDeleteAnalysis = async (id: string) => {
     try {
+      setError(null);
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analysis/${id}`,
         {
@@ -77,7 +90,8 @@ export default function Home() {
         }
       );
       if (!response.ok) {
-        throw new Error('Failed to delete analysis');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to delete analysis' }));
+        throw new Error(errorData.error || `Failed to delete analysis (${response.status})`);
       }
       
       // If the deleted analysis is currently displayed, clear it
@@ -88,7 +102,12 @@ export default function Home() {
       // Invalidate and refetch the analyses query to update the history
       queryClient.invalidateQueries({ queryKey: ['analyses'] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete analysis');
+      // Handle network errors
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Network error: Could not connect to the API server.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to delete analysis');
+      }
     }
   };
 
@@ -115,6 +134,7 @@ export default function Home() {
             <AnalysisHistory
               onSelectAnalysis={handleSelectAnalysis}
               onDeleteAnalysis={handleDeleteAnalysis}
+              selectedAnalysisId={analysis?.id}
             />
           </div>
         </div>
