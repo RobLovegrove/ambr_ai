@@ -18,9 +18,13 @@ export const contract = c.router({
       }),
       400: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
       500: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
     },
   },
@@ -52,9 +56,13 @@ export const contract = c.router({
       }),
       404: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
       500: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
     },
   },
@@ -81,9 +89,13 @@ export const contract = c.router({
       }),
       400: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
       500: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
     },
   },
@@ -100,9 +112,13 @@ export const contract = c.router({
       }),
       404: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
       500: z.object({
         error: z.string(),
+        errorCode: z.string().optional(),
+        canRetry: z.boolean().optional(),
       }),
     },
   },

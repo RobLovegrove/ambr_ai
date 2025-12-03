@@ -2,6 +2,7 @@ import { prisma } from '@ambr/db';
 import { OpenAIAdapter, AnthropicAdapter, type LLMAdapter } from '@ambr/llm';
 import { LLMAdapterError } from '@ambr/llm/src/adapter';
 import { Prisma } from '@prisma/client';
+import { translateError } from './errorTranslator';
 
 /**
  * Get the primary LLM adapter based on available API keys
@@ -40,10 +41,13 @@ export async function analyzeTranscript(transcriptText: string) {
   const primaryAdapter = getPrimaryAdapter();
   
   if (!primaryAdapter) {
+    const error = translateError(new Error('No LLM API key found'));
     return {
       status: 500,
       body: {
-        error: 'No LLM API key found. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY in your .env file',
+        error: error.userMessage,
+        errorCode: error.errorCode,
+        canRetry: error.canRetry,
       },
     };
   }
@@ -175,59 +179,75 @@ export async function analyzeTranscript(transcriptText: string) {
           };
         } catch (fallbackError) {
           // Both adapters failed
+          const translatedError = translateError(
+            new Error(`Both adapters failed. Primary: ${error.message}. Fallback: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`)
+          );
+          // Log technical details server-side
+          console.error('Both LLM adapters failed:', {
+            primary: error.message,
+            fallback: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
+          });
           return {
             status: 500,
             body: {
-              error: `LLM analysis failed on both primary and fallback adapters. Primary: ${error.message}. Fallback: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`,
+              error: translatedError.userMessage,
+              errorCode: translatedError.errorCode,
+              canRetry: translatedError.canRetry,
             },
           };
         }
       }
       
-      // No fallback available, return primary error
+      // No fallback available, return translated primary error
+      const translatedError = translateError(error);
+      // Log technical details server-side
+      console.error('LLM analysis failed:', translatedError.technicalDetails);
       return {
         status: 500,
         body: {
-          error: `LLM analysis failed: ${error.message}`,
+          error: translatedError.userMessage,
+          errorCode: translatedError.errorCode,
+          canRetry: translatedError.canRetry,
         },
       };
     }
     
     // Handle Prisma validation errors
     if (error instanceof Prisma.PrismaClientValidationError) {
+      const translatedError = translateError(error);
       return {
         status: 400,
         body: {
-          error: `Invalid data: ${error.message}`,
+          error: translatedError.userMessage,
+          errorCode: translatedError.errorCode,
+          canRetry: translatedError.canRetry,
         },
       };
     }
     
     // Handle Prisma client errors (connection, etc.)
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const translatedError = translateError(error);
+      console.error('Database error:', translatedError.technicalDetails);
       return {
         status: 500,
         body: {
-          error: 'Database error occurred',
+          error: translatedError.userMessage,
+          errorCode: translatedError.errorCode,
+          canRetry: translatedError.canRetry,
         },
       };
     }
     
     // Handle generic errors
-    if (error instanceof Error) {
-      return {
-        status: 500,
-        body: {
-          error: error.message,
-        },
-      };
-    }
-    
-    // Fallback for unknown errors
+    const translatedError = translateError(error);
+    console.error('Unexpected error:', translatedError.technicalDetails);
     return {
       status: 500,
       body: {
-        error: 'Unknown error occurred',
+        error: translatedError.userMessage,
+        errorCode: translatedError.errorCode,
+        canRetry: translatedError.canRetry,
       },
     };
   }
@@ -252,6 +272,8 @@ export async function getAnalysisById(id: string) {
         status: 404,
         body: {
           error: 'Analysis not found',
+          errorCode: 'NOT_FOUND',
+          canRetry: false,
         },
       };
     }
@@ -282,18 +304,16 @@ export async function getAnalysisById(id: string) {
       },
     };
   } catch (error) {
+    const translatedError = translateError(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return {
-        status: 500,
-        body: {
-          error: 'Database error occurred',
-        },
-      };
+      console.error('Database error:', translatedError.technicalDetails);
     }
     return {
       status: 500,
       body: {
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: translatedError.userMessage,
+        errorCode: translatedError.errorCode,
+        canRetry: translatedError.canRetry,
       },
     };
   }
@@ -313,6 +333,8 @@ export async function listAnalyses(options?: { limit?: number; offset?: number }
         status: 400,
         body: {
           error: 'Limit must be between 1 and 100',
+          errorCode: 'VALIDATION_ERROR',
+          canRetry: false,
         },
       };
     }
@@ -321,6 +343,8 @@ export async function listAnalyses(options?: { limit?: number; offset?: number }
         status: 400,
         body: {
           error: 'Offset must be non-negative',
+          errorCode: 'VALIDATION_ERROR',
+          canRetry: false,
         },
       };
     }
@@ -357,18 +381,16 @@ export async function listAnalyses(options?: { limit?: number; offset?: number }
       },
     };
   } catch (error) {
+    const translatedError = translateError(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return {
-        status: 500,
-        body: {
-          error: 'Database error occurred',
-        },
-      };
+      console.error('Database error:', translatedError.technicalDetails);
     }
     return {
       status: 500,
       body: {
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: translatedError.userMessage,
+        errorCode: translatedError.errorCode,
+        canRetry: translatedError.canRetry,
       },
     };
   }
@@ -388,6 +410,8 @@ export async function deleteAnalysisById(id: string) {
         status: 404,
         body: {
           error: 'Analysis not found',
+          errorCode: 'NOT_FOUND',
+          canRetry: false,
         },
       };
     }
@@ -405,18 +429,16 @@ export async function deleteAnalysisById(id: string) {
       },
     };
   } catch (error) {
+    const translatedError = translateError(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return {
-        status: 500,
-        body: {
-          error: 'Database error occurred',
-        },
-      };
+      console.error('Database error:', translatedError.technicalDetails);
     }
     return {
       status: 500,
       body: {
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: translatedError.userMessage,
+        errorCode: translatedError.errorCode,
+        canRetry: translatedError.canRetry,
       },
     };
   }

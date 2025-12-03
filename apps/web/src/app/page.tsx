@@ -7,6 +7,12 @@ import { AnalysisResults } from '../components/AnalysisResults';
 import { AnalysisHistory } from '../components/AnalysisHistory';
 import type { MeetingAnalysis } from '@ambr/shared';
 
+interface ApiError {
+  error: string;
+  errorCode?: string;
+  canRetry?: boolean;
+}
+
 export default function Home() {
   const queryClient = useQueryClient();
   const [analysis, setAnalysis] = useState<
@@ -14,10 +20,16 @@ export default function Home() {
   >(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState<string>('');
 
   const handleAnalyze = async (transcript: string) => {
     setIsLoading(true);
     setError(null);
+    setErrorCode(null);
+    setCanRetry(false);
+    setCurrentTranscript(transcript);
 
     try {
       const response = await fetch(
@@ -32,8 +44,11 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to analyze transcript' }));
-        throw new Error(errorData.error || `Failed to analyze transcript (${response.status})`);
+        const errorData: ApiError = await response.json().catch(() => ({ error: 'Failed to analyze transcript' }));
+        setError(errorData.error || 'Failed to analyze transcript');
+        setErrorCode(errorData.errorCode || null);
+        setCanRetry(errorData.canRetry ?? true);
+        return; // Don't throw, error state is set
       }
 
       const data = await response.json();
@@ -44,9 +59,13 @@ export default function Home() {
     } catch (err) {
       // Handle network errors
       if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Network error: Could not connect to the API server. Please check if the server is running.');
+        setError('Unable to connect to the server. Please check your internet connection and try again.');
+        setErrorCode('NETWORK_ERROR');
+        setCanRetry(true);
       } else {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
+        setErrorCode('UNKNOWN_ERROR');
+        setCanRetry(true);
       }
     } finally {
       setIsLoading(false);
@@ -56,26 +75,37 @@ export default function Home() {
   const handleNewAnalysis = () => {
     setAnalysis(null);
     setError(null);
+    setErrorCode(null);
+    setCanRetry(false);
   };
 
   const handleSelectAnalysis = async (id: string) => {
     try {
       setError(null);
+      setErrorCode(null);
+      setCanRetry(false);
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analysis/${id}`
       );
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analysis' }));
-        throw new Error(errorData.error || `Failed to fetch analysis (${response.status})`);
+        const errorData: ApiError = await response.json().catch(() => ({ error: 'Failed to fetch analysis' }));
+        setError(errorData.error || 'Failed to fetch analysis');
+        setErrorCode(errorData.errorCode || null);
+        setCanRetry(errorData.canRetry ?? false);
+        return;
       }
       const data = await response.json();
       setAnalysis(data);
     } catch (err) {
       // Handle network errors
       if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Network error: Could not connect to the API server.');
+        setError('Unable to connect to the server. Please check your internet connection and try again.');
+        setErrorCode('NETWORK_ERROR');
+        setCanRetry(true);
       } else {
         setError(err instanceof Error ? err.message : 'Failed to load analysis');
+        setErrorCode('UNKNOWN_ERROR');
+        setCanRetry(true);
       }
     }
   };
@@ -83,6 +113,8 @@ export default function Home() {
   const handleDeleteAnalysis = async (id: string) => {
     try {
       setError(null);
+      setErrorCode(null);
+      setCanRetry(false);
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/analysis/${id}`,
         {
@@ -90,8 +122,11 @@ export default function Home() {
         }
       );
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to delete analysis' }));
-        throw new Error(errorData.error || `Failed to delete analysis (${response.status})`);
+        const errorData: ApiError = await response.json().catch(() => ({ error: 'Failed to delete analysis' }));
+        setError(errorData.error || 'Failed to delete analysis');
+        setErrorCode(errorData.errorCode || null);
+        setCanRetry(errorData.canRetry ?? false);
+        return;
       }
       
       // If the deleted analysis is currently displayed, clear it
@@ -104,9 +139,13 @@ export default function Home() {
     } catch (err) {
       // Handle network errors
       if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Network error: Could not connect to the API server.');
+        setError('Unable to connect to the server. Please check your internet connection and try again.');
+        setErrorCode('NETWORK_ERROR');
+        setCanRetry(true);
       } else {
         setError(err instanceof Error ? err.message : 'Failed to delete analysis');
+        setErrorCode('UNKNOWN_ERROR');
+        setCanRetry(true);
       }
     }
   };
@@ -124,6 +163,9 @@ export default function Home() {
               onSubmit={handleAnalyze}
               isLoading={isLoading}
               error={error}
+              errorCode={errorCode}
+              canRetry={canRetry}
+              onRetry={() => currentTranscript && handleAnalyze(currentTranscript)}
               onNewAnalysis={handleNewAnalysis}
               hasAnalysis={!!analysis}
               initialTranscript={analysis?.transcriptText || ''}

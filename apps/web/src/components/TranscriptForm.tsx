@@ -6,6 +6,9 @@ interface TranscriptFormProps {
   onSubmit: (transcript: string) => void;
   isLoading: boolean;
   error: string | null;
+  errorCode?: string | null;
+  canRetry?: boolean;
+  onRetry?: () => void;
   onNewAnalysis?: () => void;
   hasAnalysis?: boolean;
   initialTranscript?: string;
@@ -18,6 +21,9 @@ export function TranscriptForm({
   onSubmit,
   isLoading,
   error,
+  errorCode,
+  canRetry = false,
+  onRetry,
   onNewAnalysis,
   hasAnalysis = false,
   initialTranscript = '',
@@ -104,7 +110,16 @@ export function TranscriptForm({
         </div>
         {error && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-            {error}
+            <p className="font-medium">{error}</p>
+            {canRetry && onRetry && !hasAnalysis && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+              >
+                Try Again
+              </button>
+            )}
           </div>
         )}
       </form>
