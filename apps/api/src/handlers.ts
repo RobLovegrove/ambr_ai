@@ -34,10 +34,54 @@ function getFallbackAdapter(primaryAdapter: LLMAdapter): LLMAdapter | null {
 }
 
 /**
+ * Validate that the transcript looks like actual meeting content
+ * This is a basic check to catch obvious non-transcripts (URLs, code, etc.)
+ */
+function isValidTranscript(text: string): { valid: boolean; reason?: string } {
+  const trimmed = text.trim();
+  
+  // Too short to be a meaningful transcript
+  if (trimmed.length < 10) {
+    return { valid: false, reason: 'Transcript is too short to analyze' };
+  }
+  
+  // Looks like a URL (starts with http:// or https://)
+  if (/^https?:\/\//i.test(trimmed)) {
+    return { valid: false, reason: 'The input appears to be a URL, not a meeting transcript' };
+  }
+  
+  // Single line that's just a URL pattern
+  if (trimmed.split('\n').length === 1 && /^(www\.|http|https|localhost|\.com|\.org)/i.test(trimmed)) {
+    return { valid: false, reason: 'The input appears to be a URL or web address, not a meeting transcript' };
+  }
+  
+  // Looks like JSON (starts with { or [)
+  if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && trimmed.length < 200) {
+    return { valid: false, reason: 'The input appears to be JSON or code, not a meeting transcript' };
+  }
+  
+  // Otherwise, assume it's valid and let the LLM handle it
+  // The improved prompts will prevent hallucination
+  return { valid: true };
+}
+
+/**
  * Analyze a transcript and store the results
  * Automatically falls back to alternative LLM if primary fails
  */
 export async function analyzeTranscript(transcriptText: string) {
+  // Validate transcript before processing
+  const validation = isValidTranscript(transcriptText);
+  if (!validation.valid) {
+    return {
+      status: 400,
+      body: {
+        error: validation.reason || 'The input does not appear to be a valid meeting transcript. Please provide a meeting transcript with dialogue or discussion content.',
+        errorCode: 'VALIDATION_ERROR',
+        canRetry: false,
+      },
+    };
+  }
   const primaryAdapter = getPrimaryAdapter();
   
   if (!primaryAdapter) {

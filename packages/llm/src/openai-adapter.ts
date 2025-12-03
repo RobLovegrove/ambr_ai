@@ -31,9 +31,17 @@ export class OpenAIAdapter implements LLMAdapter {
 4. Overall sentiment (positive, neutral, negative, or mixed)
 5. A brief summary (optional)
 
+CRITICAL INSTRUCTIONS:
+- ONLY extract information that is explicitly stated in the transcript
+- If the input is not a meeting transcript (e.g., a URL, code, or unrelated text), return empty arrays for actionItems and keyDecisions, set sentiment to "neutral", and use a generic title
+- DO NOT invent or make up action items, decisions, or details that are not present in the transcript
+- If no action items are mentioned, return an empty array
+- If no decisions are mentioned, return an empty array
+- Only extract information that is actually discussed in the meeting
+
 IMPORTANT - Sentiment classification guidelines:
 - "positive": Meeting shows enthusiasm, celebration, success, praise, or optimistic outlook
-- "neutral": Routine updates, status reports, standard business discussions without strong emotional tone
+- "neutral": Routine updates, status reports, standard business discussions without strong emotional tone, or non-transcript content
 - "negative": Concerns, problems, complaints, criticism, or pessimistic outlook
 - "mixed": Combination of positive and negative elements
 
@@ -48,7 +56,7 @@ Return a JSON object with this structure:
   "summary": "brief summary"
 }
 
-Be thorough and extract all action items and decisions mentioned.`,
+Be thorough but ONLY extract information that is actually present in the transcript. Do not invent or infer details.`,
           },
           {
             role: 'user',
