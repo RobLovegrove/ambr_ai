@@ -7,7 +7,7 @@ A full-stack application that analyzes meeting transcripts using AI and presents
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Docker Desktop (for PostgreSQL)
+- Docker Desktop (for PostfgreSQL)
 - OpenAI API key
 
 ### Setup
@@ -32,9 +32,12 @@ A full-stack application that analyzes meeting transcripts using AI and presents
    ```env
    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ambr_assessment"
    OPENAI_API_KEY="your-openai-api-key-here"
+   ANTHROPIC_API_KEY="your-anthropic-api-key-here"  # Optional, used as fallback
    API_PORT=3001
    NEXT_PUBLIC_API_URL="http://localhost:3001"
    ```
+   
+   **Note:** You need at least one LLM API key. If both are provided, the system will automatically fall back to Anthropic if OpenAI fails (or vice versa).
 
 4. **Start PostgreSQL database**
    ```bash
@@ -166,10 +169,11 @@ Delete an analysis and all related records (cascade delete).
 
 ## 🔧 Key Decisions & Rationale
 
-### 1. **LLM Choice: GPT-3.5 Turbo**
+### 1. **LLM Choice: GPT-3.5 Turbo with Anthropic Fallback**
 - **Why:** Cost-effective, reliable, good performance for structured extraction
-- **Alternative considered:** GPT-4 Turbo (better quality but higher cost)
-- **Adapter pattern:** Easy to switch to Anthropic, Vertex, or other providers
+- **Fallback system:** Automatically switches to Anthropic Claude if OpenAI fails
+- **Adapter pattern:** Easy to switch between providers, supports multiple LLMs simultaneously
+- **Resilience:** If one provider has issues, the system automatically uses the other
 
 ### 2. **Transcript Length Limit: 50,000 characters**
 - **Why:** 
@@ -213,6 +217,13 @@ Delete an analysis and all related records (cascade delete).
   - Better UX for browsing past analyses
   - LLM generates concise 3-8 word titles
 
+### 8. **Frontend Validation & Warnings**
+- **Why:**
+  - Prevents user frustration from backend rejections
+  - Real-time feedback improves UX
+  - Warning at 90% gives users time to adjust
+  - Clear visual indicators (color coding)
+
 ## 🚧 What I'd Improve With More Time
 
 ### High Priority
@@ -225,10 +236,17 @@ Delete an analysis and all related records (cascade delete).
    - Implement proper token counting before sending to LLM
    - Add chunking strategy for very long transcripts
    - Consider using GPT-4 Turbo for longer transcripts
+   - Use tiktoken library for accurate token estimation
 
 3. **Pagination UI**
    - Add pagination controls to Analysis History
    - Currently API supports it but UI doesn't use it
+
+4. **Loading States & UX Polish**
+   - Replace text loading indicators with skeleton screens
+   - Add toast notifications for success/error feedback
+   - Improve empty states with helpful guidance
+   - Add smooth transitions and animations
 
 ### Medium Priority
 4. **Search & Filtering**
@@ -239,22 +257,34 @@ Delete an analysis and all related records (cascade delete).
    - Download analyses as JSON/CSV
    - Export action items to task management tools
 
-6. **Accessibility Improvements**
+6. **RAG (Retrieval Augmented Generation)**
+   - Store a knowledge base of analysis guidelines and best practices
+   - Provide the LLM with contextual examples of well-formatted action items and decisions
+   - Retrieve relevant guidelines based on meeting type or content
+   - Feed the LLM with company-specific preferences (e.g., "always include deadlines when mentioned", "prioritize technical decisions")
+   - Use embeddings to find and inject relevant examples into the prompt, improving consistency and quality
+   - Could include examples of good vs. bad analyses to guide the LLM's output format
+
+7. **Accessibility Improvements**
    - ARIA labels for screen readers
    - Keyboard navigation improvements
    - Focus management
 
 ### Low Priority
-7. **Performance Optimizations**
+8. **Performance Optimizations**
    - Add loading skeletons instead of text
    - Implement virtual scrolling for long history lists
    - Optimize React Query cache strategies
 
-8. **Additional Features**
+9. **Additional Features**
    - Edit analyses
    - Bulk delete
    - Analysis comparison
    - Meeting templates
+   - Toast notifications for better user feedback
+   - Keyboard shortcuts (e.g., Cmd+K for search)
+   - Dark mode
+   - Better empty states with helpful suggestions
 
 ## 🐛 Known Issues / Limitations
 
@@ -268,7 +298,8 @@ Delete an analysis and all related records (cascade delete).
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `OPENAI_API_KEY` | OpenAI API key for LLM | Yes |
+| `OPENAI_API_KEY` | OpenAI API key for LLM | At least one |
+| `ANTHROPIC_API_KEY` | Anthropic API key for LLM (fallback) | At least one |
 | `API_PORT` | Port for API server (default: 3001) | No |
 | `NEXT_PUBLIC_API_URL` | API URL for frontend (default: http://localhost:3001) | No |
 

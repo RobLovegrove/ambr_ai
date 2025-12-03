@@ -1,28 +1,56 @@
 import { prisma } from '@ambr/db';
-import { OpenAIAdapter, type LLMAdapter } from '@ambr/llm';
+import { OpenAIAdapter, AnthropicAdapter, type LLMAdapter } from '@ambr/llm';
 import { LLMAdapterError } from '@ambr/llm/src/adapter';
 import { Prisma } from '@prisma/client';
 
 /**
- * Get the LLM adapter based on available API keys
+ * Get the primary LLM adapter based on available API keys
+ * Priority: OpenAI > Anthropic
  */
-function getLLMAdapter(): LLMAdapter {
-  // Priority: OpenAI > (Anthropic can be added later)
+function getPrimaryAdapter(): LLMAdapter | null {
   if (process.env.OPENAI_API_KEY) {
     return new OpenAIAdapter();
   }
-  throw new Error('No LLM API key found. Please set OPENAI_API_KEY in your .env file');
+  if (process.env.ANTHROPIC_API_KEY) {
+    return new AnthropicAdapter();
+  }
+  return null;
+}
+
+/**
+ * Get the fallback LLM adapter (different from primary)
+ */
+function getFallbackAdapter(primaryAdapter: LLMAdapter): LLMAdapter | null {
+  // If primary is OpenAI, try Anthropic as fallback
+  if (primaryAdapter instanceof OpenAIAdapter && process.env.ANTHROPIC_API_KEY) {
+    return new AnthropicAdapter();
+  }
+  // If primary is Anthropic, try OpenAI as fallback
+  if (primaryAdapter instanceof AnthropicAdapter && process.env.OPENAI_API_KEY) {
+    return new OpenAIAdapter();
+  }
+  return null;
 }
 
 /**
  * Analyze a transcript and store the results
+ * Automatically falls back to alternative LLM if primary fails
  */
 export async function analyzeTranscript(transcriptText: string) {
-  try {
-    const adapter = getLLMAdapter();
+  const primaryAdapter = getPrimaryAdapter();
+  
+  if (!primaryAdapter) {
+    return {
+      status: 500,
+      body: {
+        error: 'No LLM API key found. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY in your .env file',
+      },
+    };
+  }
 
-    // Analyze transcript using LLM
-    const analysis = await adapter.analyzeTranscript(transcriptText);
+  try {
+    // Try primary adapter first
+    const analysis = await primaryAdapter.analyzeTranscript(transcriptText);
 
     // Store transcript in database
     const transcript = await prisma.transcript.create({
@@ -81,8 +109,82 @@ export async function analyzeTranscript(transcriptText: string) {
       },
     };
   } catch (error) {
-    // Handle LLM-specific errors
+    // If primary adapter fails, try fallback
     if (error instanceof LLMAdapterError) {
+      const fallbackAdapter = getFallbackAdapter(primaryAdapter);
+      
+      if (fallbackAdapter) {
+        try {
+          console.log(`Primary LLM failed, attempting fallback...`);
+          const analysis = await fallbackAdapter.analyzeTranscript(transcriptText);
+          
+          // Continue with fallback analysis (store in DB, etc.)
+          const transcript = await prisma.transcript.create({
+            data: {
+              text: transcriptText,
+            },
+          });
+
+          const dbAnalysis = await prisma.analysis.create({
+            data: {
+              transcriptId: transcript.id,
+              title: analysis.title || null,
+              sentiment: analysis.sentiment,
+              summary: analysis.summary || null,
+              actionItems: {
+                create: analysis.actionItems.map((item) => ({
+                  description: item.description,
+                  owner: item.owner,
+                  deadline: item.deadline,
+                })),
+              },
+              keyDecisions: {
+                create: analysis.keyDecisions.map((decision) => ({
+                  decision: decision.decision,
+                  context: decision.context,
+                })),
+              },
+            },
+            include: {
+              actionItems: true,
+              keyDecisions: true,
+            },
+          });
+
+          return {
+            status: 200,
+            body: {
+              id: dbAnalysis.id,
+              transcriptId: dbAnalysis.transcriptId,
+              title: dbAnalysis.title || undefined,
+              actionItems: dbAnalysis.actionItems.map((item) => ({
+                id: item.id,
+                description: item.description,
+                owner: item.owner,
+                deadline: item.deadline,
+              })),
+              keyDecisions: dbAnalysis.keyDecisions.map((decision) => ({
+                id: decision.id,
+                decision: decision.decision,
+                context: decision.context,
+              })),
+              sentiment: dbAnalysis.sentiment as 'positive' | 'neutral' | 'negative' | 'mixed',
+              summary: dbAnalysis.summary || undefined,
+              createdAt: dbAnalysis.createdAt.toISOString(),
+            },
+          };
+        } catch (fallbackError) {
+          // Both adapters failed
+          return {
+            status: 500,
+            body: {
+              error: `LLM analysis failed on both primary and fallback adapters. Primary: ${error.message}. Fallback: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`,
+            },
+          };
+        }
+      }
+      
+      // No fallback available, return primary error
       return {
         status: 500,
         body: {

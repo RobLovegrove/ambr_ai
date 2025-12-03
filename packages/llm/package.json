@@ -9,10 +9,10 @@
   },
   "dependencies": {
     "@ambr/shared": "*",
+    "@anthropic-ai/sdk": "^0.71.0",
     "openai": "^4.20.1"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
   }
 }
-
